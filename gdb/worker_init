@@ -1,0 +1,44 @@
+# .gdbinit - 调试nginx worker进程
+# 功能：启动nginx（worker进程数为1），并在worker进程的第一行代码处中断
+
+# 生成临时nginx配置文件（逐行写入）
+shell rm -f /tmp/gdb_nginx.conf
+shell echo "worker_processes 1;" > /tmp/gdb_nginx.conf
+shell echo "daemon off;" >> /tmp/gdb_nginx.conf
+shell echo "master_process on;" >> /tmp/gdb_nginx.conf
+shell echo "" >> /tmp/gdb_nginx.conf
+shell echo "events {" >> /tmp/gdb_nginx.conf
+shell echo "    worker_connections 1024;" >> /tmp/gdb_nginx.conf
+shell echo "}" >> /tmp/gdb_nginx.conf
+shell echo "" >> /tmp/gdb_nginx.conf
+shell echo "http {" >> /tmp/gdb_nginx.conf
+shell echo "    access_log off;" >> /tmp/gdb_nginx.conf
+shell echo "    error_log stderr info;" >> /tmp/gdb_nginx.conf
+shell echo "    server {" >> /tmp/gdb_nginx.conf
+shell echo "        listen 8080;" >> /tmp/gdb_nginx.conf
+shell echo "        location / {" >> /tmp/gdb_nginx.conf
+shell echo "            return 200 \"OK\\n\";" >> /tmp/gdb_nginx.conf
+shell echo "        }" >> /tmp/gdb_nginx.conf
+shell echo "    }" >> /tmp/gdb_nginx.conf
+shell echo "}" >> /tmp/gdb_nginx.conf
+
+# 指定要调试的程序（假设nginx在PATH中，若需指定路径请修改此行）
+file ../objs/nginx
+
+# 设置GDB在fork后跟踪子进程（worker进程）
+set follow-fork-mode child
+
+# 允许未解析的断点（符号尚未加载时暂时挂起）
+set breakpoint pending on
+
+# 在worker进程的主入口函数设置断点（NGX worker进程启动后第一条有效代码）
+break ngx_worker_process_cycle
+
+# 启动nginx，使用生成的配置文件
+run -c /tmp/gdb_nginx.conf
+
+# 当断点命中后，可自动打印相关信息（可选）
+commands 1
+    printf "\n===== Worker进程已启动，进入 ngx_worker_process_cycle() =====\n"
+    backtrace
+end

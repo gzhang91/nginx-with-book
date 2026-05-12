@@ -1,0 +1,43 @@
+# .gdbinit.master - 调试nginx master进程
+# 功能：启动nginx，并在main函数入口处中断
+
+# 生成临时nginx配置文件，保证进程在前台运行（便于调试）
+# 生成临时nginx配置文件（逐行写入，避免heredoc问题）
+shell rm -f /tmp/gdb_nginx_master.conf
+shell echo "worker_processes 1;" > /tmp/gdb_nginx_master.conf
+shell echo "daemon off;" >> /tmp/gdb_nginx_master.conf
+shell echo "master_process on;" >> /tmp/gdb_nginx_master.conf
+shell echo "" >> /tmp/gdb_nginx_master.conf
+shell echo "events {" >> /tmp/gdb_nginx_master.conf
+shell echo "    worker_connections 1024;" >> /tmp/gdb_nginx_master.conf
+shell echo "}" >> /tmp/gdb_nginx_master.conf
+shell echo "" >> /tmp/gdb_nginx_master.conf
+shell echo "http {" >> /tmp/gdb_nginx_master.conf
+shell echo "    access_log off;" >> /tmp/gdb_nginx_master.conf
+shell echo "    error_log stderr info;" >> /tmp/gdb_nginx_master.conf
+shell echo "    server {" >> /tmp/gdb_nginx_master.conf
+shell echo "        listen 8080;" >> /tmp/gdb_nginx_master.conf
+shell echo "        location / {" >> /tmp/gdb_nginx_master.conf
+shell echo "            return 200 \"OK\\n\";" >> /tmp/gdb_nginx_master.conf
+shell echo "        }" >> /tmp/gdb_nginx_master.conf
+shell echo "    }" >> /tmp/gdb_nginx_master.conf
+shell echo "}" >> /tmp/gdb_nginx_master.conf
+
+# 指定要调试的程序（根据实际nginx路径修改，默认使用$PATH中的nginx）
+file ../objs/nginx
+
+# 建议在fork时继续调试父进程（master），不跟随子进程（worker）
+# 若希望worker也中断，可改为 child 或 ask，此处为了专注master，设为 parent
+set follow-fork-mode parent
+
+# 在main函数设置断点（nginx入口）
+break main
+
+# 启动nginx，使用生成的配置文件
+run -c /tmp/gdb_nginx_master.conf
+
+# 断点命中后自动打印信息
+commands 1
+    printf "\n===== 已进入 main() 函数，master进程启动中 =====\n"
+    backtrace
+end
